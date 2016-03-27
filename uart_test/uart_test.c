@@ -10,7 +10,7 @@
 #define BAUD 115200
 #include <util/setbaud.h>
 #define USART_BAUDRATE 9600
-#define UBRR_VALUE (((F_CPU / (USART_BAUDRATE * 16UL))) - 1)
+#define UBRR_VAL (((F_CPU / (USART_BAUDRATE * 16UL))) - 1)
 
 void uart_putchar(char c) {
    loop_until_bit_is_set(UCSR0A, UDRE0); /* Wait until data register empty. */
@@ -29,8 +29,8 @@ FILE uart_io = FDEV_SETUP_STREAM(uart_putchar, uart_getchar, _FDEV_SETUP_RW);
 void USART0Init(void)
 {
   // Set baud rate
-  UBRR0H = (uint8_t)(UBRR_VALUE>>8);
-  UBRR0L = (uint8_t)UBRR_VALUE;
+  UBRR0H = (uint8_t)(UBRR_VAL>>8);
+  UBRR0L = (uint8_t)UBRR_VAL;
   // Set frame format to 8 data bits, no parity, 1 stop bit
   UCSR0C |= (1<<UCSZ01)|(1<<UCSZ00);
   //enable transmission and reception
@@ -64,6 +64,7 @@ int main (void)
     // Receive data
     u8TempData = USART0ReceiveByte();
     // Increment received data
+    printf("%d\n", u8TempData);
      u8TempData++;
     //Send back to terminal
     USART0SendByte(u8TempData);
