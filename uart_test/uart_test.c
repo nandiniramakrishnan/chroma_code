@@ -1,6 +1,30 @@
+/* some includes */
+#include <inttypes.h>
 #include <avr/io.h>
+#include <avr/pgmspace.h>
+#include <avr/interrupt.h>
+#include <avr/wdt.h>
+#include <util/delay.h>
+#include <stdio.h>
+
+#define BAUD 115200
+#include <util/setbaud.h>
 #define USART_BAUDRATE 9600
 #define UBRR_VALUE (((F_CPU / (USART_BAUDRATE * 16UL))) - 1)
+
+void uart_putchar(char c) {
+   loop_until_bit_is_set(UCSR0A, UDRE0); /* Wait until data register empty. */
+   UDR0 = c;
+}
+
+char uart_getchar(void) {
+   loop_until_bit_is_set(UCSR0A, RXC0); /* Wait until data exists. */
+   return UDR0;
+}
+
+FILE uart_output = FDEV_SETUP_STREAM(uart_putchar, NULL, _FDEV_SETUP_WRITE);
+FILE uart_input = FDEV_SETUP_STREAM(NULL, uart_getchar, _FDEV_SETUP_READ);
+FILE uart_io = FDEV_SETUP_STREAM(uart_putchar, uart_getchar, _FDEV_SETUP_RW);
 
 void USART0Init(void)
 {
@@ -31,7 +55,7 @@ uint8_t USART0ReceiveByte()
 
 int main (void)
 {
-  uint8_t u8TempData = 0xAA;
+  uint8_t u8TempData = 0x01;
   //Initialize USART0
   USART0Init();
   USART0SendByte(u8TempData);
@@ -40,7 +64,7 @@ int main (void)
     // Receive data
     u8TempData = USART0ReceiveByte();
     // Increment received data
-    // u8TempData++;
+     u8TempData++;
     //Send back to terminal
     USART0SendByte(u8TempData);
   }
