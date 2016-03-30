@@ -1,36 +1,12 @@
-/* some includes */
-#include <inttypes.h>
 #include <avr/io.h>
-#include <avr/pgmspace.h>
-#include <avr/interrupt.h>
-#include <avr/wdt.h>
-#include <util/delay.h>
-#include <stdio.h>
-
-#define BAUD 115200
-#include <util/setbaud.h>
 #define USART_BAUDRATE 9600
-#define UBRR_VAL (((F_CPU / (USART_BAUDRATE * 16UL))) - 1)
-
-void uart_putchar(char c) {
-   loop_until_bit_is_set(UCSR0A, UDRE0); /* Wait until data register empty. */
-   UDR0 = c;
-}
-
-char uart_getchar(void) {
-   loop_until_bit_is_set(UCSR0A, RXC0); /* Wait until data exists. */
-   return UDR0;
-}
-
-FILE uart_output = FDEV_SETUP_STREAM(uart_putchar, NULL, _FDEV_SETUP_WRITE);
-FILE uart_input = FDEV_SETUP_STREAM(NULL, uart_getchar, _FDEV_SETUP_READ);
-FILE uart_io = FDEV_SETUP_STREAM(uart_putchar, uart_getchar, _FDEV_SETUP_RW);
+#define UBRR_VALUE (((F_CPU / (USART_BAUDRATE * 16UL))) - 1)
 
 void USART0Init(void)
 {
   // Set baud rate
-  UBRR0H = (uint8_t)(UBRR_VAL>>8);
-  UBRR0L = (uint8_t)UBRR_VAL;
+  UBRR0H = (uint8_t)(UBRR_VALUE>>8);
+  UBRR0L = (uint8_t)UBRR_VALUE;
   // Set frame format to 8 data bits, no parity, 1 stop bit
   UCSR0C |= (1<<UCSZ01)|(1<<UCSZ00);
   //enable transmission and reception
@@ -55,18 +31,17 @@ uint8_t USART0ReceiveByte()
 
 int main (void)
 {
-  uint8_t u8TempData = 0x01;
+  uint8_t u8TempData;
   //Initialize USART0
   USART0Init();
-  USART0SendByte(u8TempData);
   while(1)
   {
     // Receive data
     u8TempData = USART0ReceiveByte();
     // Increment received data
-    printf("%d\n", u8TempData);
-     u8TempData++;
+    u8TempData++;
     //Send back to terminal
     USART0SendByte(u8TempData);
   }
 }
+
