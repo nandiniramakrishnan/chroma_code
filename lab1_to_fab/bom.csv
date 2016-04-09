@@ -1,0 +1,12 @@
+18-549 Bill of Materials,,,,,
+Andrew ID:,jmaccarl,,,,
+Team #:,6,,,,
+,,,,,
+Part IDs,Manufacturer ID,Quantity,Cost,Vendor,Purchasing Link
+SEN-10988,TMP36,2,$1.50 ,Sparkfun,https://www.sparkfun.com/products/10988
+PRT-08432,4u-1406CGD404,1,$0.95 ,Sparkfun,https://www.sparkfun.com/products/8432 
+COM-10213,FQP30N06L,1,$0.95 ,Sparkfun,https://www.sparkfun.com/products/10213 
+COM-11270,N/A,2,$4.95 ,Sparkfun,https://www.sparkfun.com/products/11270 
+399-1249-1-ND,C1206C104K5RAC7867,3,$0.10 ,Digikey,http://www.digikey.com/product-detail/en/C1206C104K5RAC7867/399-1249-1-ND/411524
+399-7444-1-ND,C1206C226M8RACTU,3,$0.64 ,Digikey,http://www.digikey.com/product-detail/en/C1206C226M8RACTU/399-7444-1-ND/3317478
+311-1.00KFRCT-ND,RC1206FR-071KL,3,$0.10 ,Digikey,http://www.digikey.com/product-detail/en/RC1206FR-071KL/311-1.00KFRCT-ND/731334
