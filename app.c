@@ -50,6 +50,12 @@ u8buf buf;
 // Global to turn motor on and off
 volatile uint8_t motor_on = 0;
 
+unsigned long interval = 20;
+volatile unsigned long cyanVal = 0;
+volatile unsigned long magentaVal = 0;
+volatile unsigned long yellowVal = 0;
+volatile unsigned uint8_t finishedCount = 0;
+
 /* --------- METHODS CALLED DURING START UP --------- */
 
 /* pwm_init: Register settings for PWM to actuate the fuel injectors */
@@ -92,15 +98,6 @@ void pump_init() {
 
 /* --------- END START UP METHODS --------- */
 
-/* reset_printer: Call after finishing printing a colour */
-void reset_printer() {
-  pwm_init();
-  timer_init();
-  motor_init();
-  pump_init();
-  uart_init();
-  timer_intt_off();
-}
 
 /* timer_intt_on: Enable timer 2 overflow interrupt */
 void timer_intt_on() {
@@ -214,16 +211,19 @@ void buffer_write(u8buf *buf, uint8_t u8data) {
     cyan = u8data;
     pump1_on();
     pwm1_on();
+    cyanVal = cyan*interval;
   }
   else if (buf->index == 2) {
     magenta = u8data;
     pump2_on();
     pwm2_on();
+    magentaVal = magenta*interval;
   }
   else if (buf->index == 3) {
     yellow = u8data;
     pump3_on();
     pwm3_on();
+    yellowVal = yellow*interval;
   }
   motor_on = 1;
   timer_intt_on();
@@ -249,6 +249,16 @@ void uart_init() {
 
 /* --------- END UART --------- */
 
+/* reset_printer: Call after finishing printing a colour */
+void reset_printer() {
+  pwm_init();
+  timer_init();
+  motor_init();
+  pump_init();
+  uart_init();
+  timer_intt_off();
+  finishedCount = 0;
+}
 
 /* ---------- Interrupt Subroutines --------- */
 
@@ -279,27 +289,30 @@ ISR(USART_UDRE_vect) {
   }
 }
 
-// timer2 overflow
+// Timer2 overflow interrupt
 ISR(TIMER2_OVF_vect) {
-  unsigned long interval = 20;
-  volatile unsigned long cyanVal = cyan*interval;
-  volatile unsigned long magentaVal = magenta*interval;
-  volatile unsigned long yellowVal = yellow*interval;
   if (cyan_overflow_count == cyanVal) {
     pump1_off();
     pwm1_off();
-    cyan_overflow_count++;
+    finshedCount++;
   }
   if (magenta_overflow_count == magentaVal) {
     pump2_off();
     pwm2_off();
-    magenta_overflow_count++;
+    finishedCount++;
   }
   if (yellow_overflow_count == yellowVal) {
     pump3_off();
     pwm3_off();
-    yellow_overflow_count++;
+    finishedCount++;
   }
+  if (finishedCount == 3) {
+    timer_intt_off();
+    reset_printer(); 
+  }
+  cyan_overflow_count++;
+  magenta_overflow_count++;
+  yellow_overflow_count++;
 }
 
 /* ----- End interrupt subroutines ----- */
