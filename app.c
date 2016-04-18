@@ -24,6 +24,7 @@
 //define max buffer size
 #define BUF_SIZE 20
 #define DELAY 3
+#define INTERVAL 25
 /* --------- GLOBAL VARIABLES ---------- */
 
 // Counter used for each colour in the Timer Overflow Interrupt
@@ -50,7 +51,6 @@ u8buf buf;
 // Global to turn motor on and off
 volatile uint8_t motor_on;
 
-volatile unsigned long interval = 25;
 volatile unsigned long cyanVal;
 volatile unsigned long magentaVal;
 volatile unsigned long yellowVal;
@@ -219,19 +219,19 @@ void buffer_write(u8buf *buf, volatile uint8_t u8data) {
     // store the received colour value
     cyan = u8data;
     // scale up the amount of time you need the pump to be on
-    cyanVal = cyan*interval;
+    cyanVal = cyan*INTERVAL;
     pump1_on();
     pwm1_on();
   }
   else if (buf->index == 2) {
-    magentaVal = magenta*interval;
+    magentaVal = magenta*INTERVAL;
     magenta = u8data;
     pump2_on();
     pwm2_on();
   }
   else if (buf->index == 3) {
     yellow = u8data;
-    yellowVal = yellow*interval;
+    yellowVal = yellow*INTERVAL;
     // received all values. Turn on pumps and injectors
     pump3_on();
     pwm3_on();
