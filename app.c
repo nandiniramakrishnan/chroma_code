@@ -28,15 +28,15 @@
 
 /* --------- GLOBAL VARIABLES ---------- */
 
-// Counter used for each colour in the Timer Overflow Interrupt
-volatile unsigned long cyan_overflow_count;
-volatile unsigned long magenta_overflow_count;
-volatile unsigned long yellow_overflow_count;
-
 // Variables to store received bytes for each colour from UART
 volatile uint8_t cyan;
 volatile uint8_t magenta;
 volatile uint8_t yellow;
+
+// Counter used for each colour in the Timer Overflow Interrupt
+volatile unsigned long cyan_overflow_count;
+volatile unsigned long magenta_overflow_count;
+volatile unsigned long yellow_overflow_count;
 
 // type definition of buffer structure
 typedef struct {
@@ -52,9 +52,12 @@ u8buf buf;
 // Global to turn motor on and off
 volatile uint8_t motor_on;
 
+// Scaled colour values used as timer count limits
 volatile unsigned long cyanVal;
 volatile unsigned long magentaVal;
 volatile unsigned long yellowVal;
+
+// Count to keep track of how many colours are done printing
 volatile uint8_t finishedCount;
 
 /* --------- METHODS CALLED DURING START UP --------- */
@@ -199,8 +202,8 @@ int buf_full(u8buf *buf) {
 }
 
 // write to buffer routine
-void buffer_write(u8buf *buf, volatile uint8_t u8data) {
-  if (!buf_full(buf)) {
+void buffer_write(u8buf *buf, uint8_t u8data) {
+  if (buf_full(buf) == 0) {
     buf->buffer[buf->index] = u8data;
     // increment buffer index
     buf->index++;
@@ -214,8 +217,8 @@ void buffer_write(u8buf *buf, volatile uint8_t u8data) {
     pwm1_on();
   }
   else if (buf->index == 2) {
-    magentaVal = magenta*INTERVAL;
     magenta = u8data;
+    magentaVal = magenta*INTERVAL;
     pump2_on();
     pwm2_on();
   }
@@ -233,7 +236,7 @@ void buffer_write(u8buf *buf, volatile uint8_t u8data) {
 
 /* Not currently being used. Needed to transmit things to app */
 void buffer_read(u8buf *buf, volatile uint8_t *u8data) {
-  if (!buf_empty(buf)) {
+  if (buf_empty(buf) == 0) {
     buf->index--;
     *u8data = buf->buffer[buf->index];
   }
