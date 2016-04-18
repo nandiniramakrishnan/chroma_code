@@ -24,7 +24,7 @@
 //define max buffer size
 #define BUF_SIZE 20
 #define DELAY 3
-#define INTERVAL 25
+#define INTERVAL 35
 
 /* --------- GLOBAL VARIABLES ---------- */
 
