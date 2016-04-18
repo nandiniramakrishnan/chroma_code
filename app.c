@@ -83,9 +83,14 @@ void pwm_init() {
 
 /* timer_init: Using the timer on OC2B */
 void timer_init() {
+  // disable timer 2 interrupts
+  TIMSK2 = 0;
   // Initialize Timer 0 counter to 0
-  TCNT2 = 0x00;
-  TCCR2B |= (1 << CS20) | (1 << CS22);      // Prescale by 1024
+  TCNT2 = 0;
+  // prescale by 1024
+  TCCR2B |= (1 << CS20) | (1 << CS22);
+  // clear interrupt flags
+  TIFR2 = (1 << TOV2);
 }
 
 /* motor_init: Set motor pins as output and stop any rotation */
@@ -105,7 +110,7 @@ void pump_init() {
 
 /* timer_intt_on: Enable timer 2 overflow interrupt */
 void timer_intt_on() {
-  TIMSK2 |= 0x01;           // 0000 0001
+  TIMSK2 = (1 << TOIE2);           // 0000 0001
 }
 
 /* timer_intt_off: Disable timer 2 overflow interrupt */
@@ -289,7 +294,7 @@ ISR(USART_RX_vect) {
   u8temp = UDR0;
   //check if period char or end of buffer
   buffer_write(&buf, u8temp);
-  if (buf_full(&buf) || (u8temp == '.')) {
+  if (buf_full(&buf)) {
     //disable reception and RX Complete interrupt
     UCSR0B &= ~((1<<RXEN0) | (1<<RXCIE0));
     //enable transmission and UDR0 empty interrupt
@@ -314,12 +319,12 @@ ISR(USART_UDRE_vect) {
 
 // Timer2 overflow interrupt
 ISR(TIMER2_OVF_vect) {
-  if (cyan_overflow_count == cyanVal) {
+  if (magenta_overflow_count == magentaVal) {
     pump1_off();
     pwm1_off();
     finishedCount++;
   }
-  if (magenta_overflow_count == magentaVal) {
+  if (cyan_overflow_count == cyanVal) {
     pump2_off();
     pwm2_off();
     finishedCount++;
