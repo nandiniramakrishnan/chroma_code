@@ -29,14 +29,14 @@
 /* --------- GLOBAL VARIABLES ---------- */
 
 // Variables to store received bytes for each colour from UART
-volatile uint8_t cyan;
-volatile uint8_t magenta;
-volatile uint8_t yellow;
+volatile uint8_t cyan = 0;
+volatile uint8_t magenta = 0;
+volatile uint8_t yellow = 0;
 
 // Counter used for each colour in the Timer Overflow Interrupt
-volatile unsigned long cyan_overflow_count;
-volatile unsigned long magenta_overflow_count;
-volatile unsigned long yellow_overflow_count;
+volatile unsigned long cyan_overflow_count = 0;
+volatile unsigned long magenta_overflow_count = 0;
+volatile unsigned long yellow_overflow_count = 0;
 
 // type definition of buffer structure
 typedef struct {
@@ -50,15 +50,19 @@ typedef struct {
 u8buf buf;
 
 // Global to turn motor on and off
-volatile uint8_t motor_on;
+volatile uint8_t motor_on = 0;
+
+volatile uint8_t getColours = 0;
 
 // Scaled colour values used as timer count limits
-volatile unsigned long cyanVal;
-volatile unsigned long magentaVal;
-volatile unsigned long yellowVal;
+volatile unsigned long cyanVal = 0;
+volatile unsigned long magentaVal = 0;
+volatile unsigned long yellowVal = 0;
 
 // Count to keep track of how many colours are done printing
-volatile uint8_t finishedCount;
+volatile uint8_t mDone = 0;
+volatile uint8_t cDone = 0;
+volatile uint8_t yDone = 0;
 
 /* --------- METHODS CALLED DURING START UP --------- */
 
@@ -70,11 +74,11 @@ void pwm_init() {
   // F1 
   TCCR0A = _BV(COM0A1) | _BV(WGM00);
   TCCR0B = _BV(CS02);
-  
+
   // F2 and F3 
   TCCR1A = _BV(COM1A1) | _BV(COM1B1) | _BV(WGM10);
   TCCR1B = _BV(CS12);
-  
+
   // Initially the injectors are off. Duty cycle = 0 
   OCR0A = 0;
   OCR1A = 0;
@@ -96,7 +100,7 @@ void timer_init() {
 /* motor_init: Set motor pins as output and stop any rotation */
 void motor_init() {
   DDRC |= (1 << DDC0) | (1 << DDC1) | (1 << DDC2) | (1 << DDC3);
-  PORTC = 0;            
+  PORTC &= 0xF0;            
 }
 
 /* pump_init: Set pump pins as output */
@@ -213,30 +217,6 @@ void buffer_write(u8buf *buf, uint8_t u8data) {
     // increment buffer index
     buf->index++;
   }
-  if (buf->index == 1) {
-    // store the received colour value
-    cyan = u8data;
-    // scale up the amount of time you need the pump to be on
-    cyanVal = cyan*INTERVAL;
-    pump1_on();
-    pwm1_on();
-  }
-  else if (buf->index == 2) {
-    magenta = u8data;
-    magentaVal = magenta*INTERVAL;
-    pump2_on();
-    pwm2_on();
-  }
-  else if (buf->index == 3) {
-    yellow = u8data;
-    yellowVal = yellow*INTERVAL;
-    pump3_on();
-    pwm3_on();
-  }
-  // Start spinning the motor in the main function
-  motor_on = 1;                
-  // Enable timer interrupts to check completion of the three colours
-  timer_intt_on();
 }
 
 /* Not currently being used. Needed to transmit things to app */
@@ -262,16 +242,21 @@ void uart_init() {
 
 /* reset_printer: Call at startup and after finishing printing a colour */
 void reset_printer() {
+  uart_init();
   // turn off timer interrupt
   timer_intt_off();
   // indicator to turn motor on and off in main. Initially its off
   motor_on = 0;
   // startup methods
+  pump_init();
   timer_init();
   cyan_overflow_count = 0;
   magenta_overflow_count = 0;
   yellow_overflow_count = 0;
-  finishedCount = 0;
+  mDone = 0;
+  cDone = 0;
+  yDone = 0;
+  getColours = 0;
 }
 
 /* ---------- Interrupt Subroutines --------- */
@@ -282,7 +267,8 @@ ISR(USART_RX_vect) {
   u8temp = UDR0;
   //check if period char or end of buffer
   buffer_write(&buf, u8temp);
-  if (buf_full(&buf)) {
+  if (buf_full(&buf) || (u8temp == '.')) {
+    getColours = 1;
     //disable reception and RX Complete interrupt
     UCSR0B &= ~((1<<RXEN0) | (1<<RXCIE0));
     //enable transmission and UDR0 empty interrupt
@@ -307,23 +293,23 @@ ISR(USART_UDRE_vect) {
 
 // Timer2 overflow interrupt
 ISR(TIMER2_OVF_vect) {
-  if (magenta_overflow_count == magentaVal) {
+  if (yellow_overflow_count > yellowVal) {
     pump1_off();
     pwm1_off();
-    finishedCount++;
+    yDone = 1;
   }
-  if (cyan_overflow_count == cyanVal) {
+  if (cyan_overflow_count > cyanVal) {
     pump2_off();
     pwm2_off();
-    finishedCount++;
+    cDone = 1;
   }
-  if (yellow_overflow_count == yellowVal) {
+  if (magenta_overflow_count > magentaVal) {
     pump3_off();
     pwm3_off();
-    finishedCount++;
+    mDone = 1;
   }
   // all colours are done spraying
-  if (finishedCount == 3) {
+  if (mDone && cDone && yDone) {
     reset_printer(); 
   }
   cyan_overflow_count++;
@@ -335,13 +321,32 @@ ISR(TIMER2_OVF_vect) {
 
 /* ----- Main routine. Only operating the motor here ----- */
 int main() {
+  // start up methods
+  motor_init();
   pwm_init();
   pump_init();
   uart_init();
-  reset_printer();
-  sei();			              /* Enable interrupts */
+  timer_init();
+  // enable interrupts
+  sei();			            
   while (1) {
-    if (motor_on) {
+    if (getColours == 1) {
+      // store the received colour value
+      cyan = buf.buffer[0];
+      // scale up the amount of time you need the pump to be on
+      cyanVal = cyan*INTERVAL;
+      magenta = buf.buffer[1];
+      magentaVal = magenta*INTERVAL;
+      yellow = buf.buffer[2];
+      yellowVal = yellow*INTERVAL;
+      injectors_on();
+      pumps_on();
+      // Enable timer interrupts to check completion of the three colours
+      timer_intt_on();
+      motor_on = 1;
+      getColours = 0;  
+    }
+    if (motor_on == 1) {
       rotate_motor();       // Turn motor on
     }
     else {
