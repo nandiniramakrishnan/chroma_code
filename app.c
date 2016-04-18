@@ -25,6 +25,7 @@
 #define BUF_SIZE 20
 #define DELAY 3
 #define INTERVAL 25
+
 /* --------- GLOBAL VARIABLES ---------- */
 
 // Counter used for each colour in the Timer Overflow Interrupt
@@ -77,7 +78,7 @@ void pwm_init() {
   OCR1B = 0;
 }
 
-/* timer_init: Using the timer on OC0B */
+/* timer_init: Using the timer on OC2B */
 void timer_init() {
   // Initialize Timer 0 counter to 0
   TCNT2 = 0x00;
@@ -185,17 +186,6 @@ void rotate_motor() {
 
 /* --------- UART Methods --------- */
 
-// initialize buffer
-void buffer_init(u8buf *buf) {
-  // set index to start of buffer
-  buf->index = 0;
-  /*
-  int i = 0;
-  for (i = 0; i < BUF_SIZE; i++) {
-    buf->buffer[i] = 0;
-  }*/
-}
-
 int buf_empty(u8buf *buf) {
   if (buf->index == 0) 
     return 1;
@@ -232,11 +222,8 @@ void buffer_write(u8buf *buf, volatile uint8_t u8data) {
   else if (buf->index == 3) {
     yellow = u8data;
     yellowVal = yellow*INTERVAL;
-    // received all values. Turn on pumps and injectors
     pump3_on();
     pwm3_on();
-    // Disable the receiver and the receive complete interrupt
-    // UCSR0B &= 0x6F;             // 0110 1111
   }
   // Start spinning the motor in the main function
   motor_on = 1;                
@@ -253,7 +240,7 @@ void buffer_read(u8buf *buf, volatile uint8_t *u8data) {
 }
 
 void uart_init() {
-  buffer_init(&buf);
+  buf.index = 0;
   // Set baud rate
   UBRR0H = (uint8_t)(UBRR_VALUE>>8);
   UBRR0L = (uint8_t)UBRR_VALUE;
@@ -265,34 +252,41 @@ void uart_init() {
 
 /* --------- END UART --------- */
 
-/* reset_printer: Call after finishing printing a colour */
+/* reset_printer: Call at startup and after finishing printing a colour */
 void reset_printer() {
+  // startup methods
   pwm_init();
   timer_init();
   motor_init();
   pump_init();
   uart_init();
+  // indicator to turn motor on and off in main. Initially its off
   motor_on = 0;
+  // turn off timer interrupt
   timer_intt_off();
-  finishedCount = 0;
+  // variables to store received colour values from app
   cyan = 0;
   magenta = 0;
   yellow = 0;
+  // scaled timer values 
   cyanVal = 0;
   magentaVal = 0;
   yellowVal = 0;
   cyan_overflow_count = 0;
   magenta_overflow_count = 0;
   yellow_overflow_count = 0;
+  finishedCount = 0;
 }
 
 /* ---------- Interrupt Subroutines --------- */
 
 //RX Complete interrupt service routine
 ISR(USART_RX_vect) {
+  uint8_t u8temp;
+  u8temp = UDR0;
   //check if period char or end of buffer
-  buffer_write(&buf, UDR0);
-  if (buf_full(&buf)) {
+  buffer_write(&buf, u8temp);
+  if (buf_full(&buf) || (u8temp == '.')) {
     //disable reception and RX Complete interrupt
     UCSR0B &= ~((1<<RXEN0) | (1<<RXCIE0));
     //enable transmission and UDR0 empty interrupt
@@ -302,12 +296,12 @@ ISR(USART_RX_vect) {
 
 // UDR0 Empty interrupt service routine
 ISR(USART_UDRE_vect) {
-  buffer_read(&buf, &UDR0);
+  // buffer_read(&buf, &UDR0);
   // if index is not at start of buffer
   if (buf_empty(&buf)) {
     // start over
     // reset buffer
-    buffer_init(&buf);
+    buf.index = 0;
     // disable transmission and UDR0 empty interrupt
     UCSR0B &= ~((1<<TXEN0) | (1<<UDRIE0));
     // enable reception and RC complete interrupt
@@ -345,7 +339,6 @@ ISR(TIMER2_OVF_vect) {
 
 /* ----- Main routine. Only operating the motor here ----- */
 int main() {
-  /* Startup methods */
   reset_printer();
   sei();			              /* Enable interrupts */
   while (1) {
