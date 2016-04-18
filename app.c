@@ -96,7 +96,7 @@ void timer_init() {
 /* motor_init: Set motor pins as output and stop any rotation */
 void motor_init() {
   DDRC |= (1 << DDC0) | (1 << DDC1) | (1 << DDC2) | (1 << DDC3);
-  PORTC &= 0xF0;              // 1111 0000
+  PORTC = 0;            
 }
 
 /* pump_init: Set pump pins as output */
@@ -262,24 +262,12 @@ void uart_init() {
 
 /* reset_printer: Call at startup and after finishing printing a colour */
 void reset_printer() {
-  // startup methods
-  pwm_init();
-  timer_init();
-  motor_init();
-  pump_init();
-  uart_init();
-  // indicator to turn motor on and off in main. Initially its off
-  motor_on = 0;
   // turn off timer interrupt
   timer_intt_off();
-  // variables to store received colour values from app
-  cyan = 0;
-  magenta = 0;
-  yellow = 0;
-  // scaled timer values 
-  cyanVal = 0;
-  magentaVal = 0;
-  yellowVal = 0;
+  // indicator to turn motor on and off in main. Initially its off
+  motor_on = 0;
+  // startup methods
+  timer_init();
   cyan_overflow_count = 0;
   magenta_overflow_count = 0;
   yellow_overflow_count = 0;
@@ -304,7 +292,7 @@ ISR(USART_RX_vect) {
 
 // UDR0 Empty interrupt service routine
 ISR(USART_UDRE_vect) {
-  // buffer_read(&buf, &UDR0);
+  buffer_read(&buf, &UDR0);
   // if index is not at start of buffer
   if (buf_empty(&buf)) {
     // start over
@@ -347,6 +335,9 @@ ISR(TIMER2_OVF_vect) {
 
 /* ----- Main routine. Only operating the motor here ----- */
 int main() {
+  pwm_init();
+  pump_init();
+  uart_init();
   reset_printer();
   sei();			              /* Enable interrupts */
   while (1) {
