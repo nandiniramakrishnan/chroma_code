@@ -109,6 +109,22 @@ void pump_init() {
   PORTD &= 0xE3;             // 1110 0011 
 }
 
+void adc_init() {
+    // AREF = AVcc
+    ADMUX = (1<<REFS0);
+ 
+    // ADC Enable and prescaler of 128
+    // 16000000/128 = 125000
+    ADCSRA = (1<<ADEN)|(1<<ADPS2)|(1<<ADPS1)|(1<<ADPS0);
+}
+
+void led_init() {
+  DDRD |= (1 << DDD5);
+  PORTD |= 0x20;              // 0010 0000
+}
+
+
+
 /* --------- END START UP METHODS --------- */
 
 
@@ -196,6 +212,26 @@ void rotate_motor() {
   _delay_ms(DELAY);
 }
 
+uint16_t adc_read(uint8_t ch)
+{
+  // select the corresponding channel 0~7
+  // ANDing with ’7′ will always keep the value
+  // of ‘ch’ between 0 and 7
+  ch &= 0b00000111;  // AND operation with 7
+  ADMUX = (ADMUX & 0xF8)|ch; // clears the bottom 3 bits before ORing
+ 
+  // start single convertion
+  // write ’1′ to ADSC
+  ADCSRA |= (1<<ADSC);
+ 
+  // wait for conversion to complete
+  // ADSC becomes ’0′ again
+  // till then, run loop continuously
+  while(ADCSRA & (1<<ADSC));
+ 
+  return (ADC);
+}
+
 /* --------- UART Methods --------- */
 
 int buf_empty(u8buf *buf) {
@@ -234,6 +270,8 @@ void uart_init() {
   UBRR0L = (uint8_t)UBRR_VALUE;
   // Set frame format to 8 data bits, no parity, 1 stop bit
   UCSR0C |= (1<<UCSZ01) | (1<<UCSZ00);
+  // disable transmission
+  UCSR0B &= 0xF7;                               // 1111 0111
   //enable reception and RC complete interrupt
   UCSR0B |= (1<<RXEN0) | (1<<RXCIE0);
 }
@@ -242,6 +280,10 @@ void uart_init() {
 
 /* reset_printer: Call at startup and after finishing printing a colour */
 void reset_printer() {
+  // at this point receiver is still disabled and transmitter is enabled
+  // send message done code 0x01
+  UDR0 = 0x01;
+  // Now, we reset the UART settings - enable receiver and disabled transmitter
   uart_init();
   // turn off timer interrupt
   timer_intt_off();
@@ -257,6 +299,7 @@ void reset_printer() {
   cDone = 0;
   yDone = 0;
   getColours = 0;
+  // turn on transmitter 
 }
 
 /* ---------- Interrupt Subroutines --------- */
@@ -327,24 +370,32 @@ int main() {
   pump_init();
   uart_init();
   timer_init();
+  adc_init();
+  led_init();
   // enable interrupts
   sei();			            
   while (1) {
-    if (getColours == 1) {
-      // store the received colour value
-      cyan = buf.buffer[0];
-      // scale up the amount of time you need the pump to be on
-      cyanVal = cyan*INTERVAL;
-      magenta = buf.buffer[1];
-      magentaVal = magenta*INTERVAL;
-      yellow = buf.buffer[2];
-      yellowVal = yellow*INTERVAL;
-      injectors_on();
-      pumps_on();
-      // Enable timer interrupts to check completion of the three colours
-      timer_intt_on();
-      motor_on = 1;
-      getColours = 0;  
+    if (getColours == 1) {        // Transmitter is on at this point and receiver is disabled
+      if (adc_read(4) > 0x7F) {
+        // 0x02: transmit message for "Cannot detect substrate"
+        UDR0 = 0x02;
+      }
+      else {
+        // store the received colour value
+        cyan = buf.buffer[0];
+        // scale up the amount of time you need the pump to be on
+        cyanVal = cyan*INTERVAL;
+        magenta = buf.buffer[1];
+        magentaVal = magenta*INTERVAL;
+        yellow = buf.buffer[2];
+        yellowVal = yellow*INTERVAL;
+        injectors_on();
+        pumps_on();
+        // Enable timer interrupts to check completion of the three colours
+        timer_intt_on();
+        motor_on = 1;
+        getColours = 0;  
+      }
     }
     if (motor_on == 1) {
       rotate_motor();       // Turn motor on
@@ -352,6 +403,7 @@ int main() {
     else {
       motor_init();         // Turn motor off
     }
+  }
   }
   return 0;
 }
